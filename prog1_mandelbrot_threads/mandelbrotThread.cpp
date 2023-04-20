@@ -34,7 +34,42 @@ void workerThreadStart(WorkerArgs * const args) {
     // to compute a part of the output image.  For example, in a
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
+    double startTime = CycleTimer::currentSeconds();
+    int numRows = args->height / args->numThreads;
+    int remainRows = args->height % args->numThreads;
+    int startRow = args->threadId * numRows;
+    if (args->threadId == args->numThreads - 1 && remainRows != 0)
+        numRows += remainRows;
+    mandelbrotSerial(args->x0, args->y0, args->x1, args->y1,
+                    args->width, args->height, startRow, numRows,
+                    args->maxIterations, args->output);
+    double endTime = CycleTimer::currentSeconds();
+    double interval = endTime - startTime;
+    printf("[thread %d]:\t\t[%.3f] ms\n", args->threadId, interval * 1000);
 
+    printf("Hello world from thread %d\n", args->threadId);
+}
+void workerThreadStartBalance(WorkerArgs* const args) {
+    double startTime = CycleTimer::currentSeconds();
+    int numRows = args->height / args->numThreads;
+    for (int i = 0; i < numRows; ++ i) {
+        int startRow = i * args->numThreads + args->threadId;
+        mandelbrotSerial(args->x0, args->y0, args->x1, args->y1,
+                        args->width, args->height, startRow, 1,
+                        args->maxIterations, args->output);
+    }
+
+    // handle some corner case
+    int remainRows = args->height % args->numThreads - 1;
+    if (remainRows >= 0 && args->threadId <= remainRows) {
+        int startRow = numRows * args->numThreads + args->threadId;
+        mandelbrotSerial(args->x0, args->y0, args->x1, args->y1,
+                        args->width, args->height, startRow, 1,
+                        args->maxIterations, args->output);
+    }
+    double endTime = CycleTimer::currentSeconds();
+    double interval = endTime - startTime;
+    printf("[thread %d]:\t\t[%.3f] ms\n", args->threadId, interval * 1000);
     printf("Hello world from thread %d\n", args->threadId);
 }
 
@@ -83,10 +118,10 @@ void mandelbrotThread(
     // are created and the main application thread is used as a worker
     // as well.
     for (int i=1; i<numThreads; i++) {
-        workers[i] = std::thread(workerThreadStart, &args[i]);
+        workers[i] = std::thread(workerThreadStartBalance, &args[i]);
     }
     
-    workerThreadStart(&args[0]);
+    workerThreadStartBalance(&args[0]);
 
     // join worker threads
     for (int i=1; i<numThreads; i++) {

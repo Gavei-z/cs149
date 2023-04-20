@@ -1,0 +1,4 @@
+*.swp
+*.ppm
+prog1_mandelbrot_threads/mandelbrot
+prog1_mandelbrot_threads/objs
